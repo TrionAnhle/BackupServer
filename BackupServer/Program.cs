@@ -19,7 +19,7 @@ namespace BackupServer
         public static String database = "master";
         public static String login = "";
         public static String password = "";
-        public static String pathBackup = "c:\\backupdatabase";
+        public static String pathBackup = "d:\\backupdatabase";
 
         public static frmChinh frmChu;
         public static frmDangNhap frmDangNhap;

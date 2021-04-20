@@ -24,6 +24,8 @@ namespace BackupServer
             dataGVTenDB.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dataGVTenDB.Columns[0].HeaderText = "Cơ sở dữ liệu";
             checkDBHasDevice();
+            dateBackup.DateTime = DateTime.Now;
+            timeBackup.Time = DateTime.Now;
             if (btnPhucHoiTheoThoiGian.Checked)
             {
                 timeBackup.Enabled = dateBackup.Enabled = true;
@@ -101,8 +103,9 @@ namespace BackupServer
                 String DBName = dataGVTenDB.CurrentRow.Cells[0].Value.ToString();
                 int numberRow = Int32.Parse(dataGVTenDB.Rows.Count.ToString()) - 1;
                 lblTenCSDL.Text = "Tên cơ sơ dữ liệu:  " + DBName;
-                loadDSBackup(DBName);
-                btnPhucHoiTheoThoiGian.Checked = false;
+                btnPhucHoiTheoThoiGian.Checked = btnPhucHoiTheoThoiGian.Enabled =btnPhucHoi.Enabled = btnSaoLuu.Enabled = false;
+                dataGVDSBackup.DataSource = null; this.dataGVDSBackup.Rows.Clear();
+                dataGVDSBackup.Refresh();
                 for (int i = 0; i < numberRow; i++)
                 {
                     if (listDBName[i].Equals(DBName))
@@ -111,7 +114,7 @@ namespace BackupServer
                         {
                             btnSaoLuu.Enabled = true;
                             btnTaoDevice.Enabled = false;
-                            
+                            loadDSBackup(DBName);
                         }
                         else
                         {
@@ -124,6 +127,9 @@ namespace BackupServer
             {
                 btnPhucHoi.Enabled = btnSaoLuu.Enabled = btnPhucHoiTheoThoiGian.Enabled = btnTaoDevice.Enabled = false;
             }
+            dateBackup.DateTime = DateTime.Now;
+            timeBackup.Time = DateTime.Now;
+            
         }
 
         private void btnLamMoi_ItemClick(object sender, DevExpress.XtraBars.ItemClickEventArgs e)
@@ -175,11 +181,40 @@ namespace BackupServer
 
         private void btnPhucHoi_ItemClick(object sender, DevExpress.XtraBars.ItemClickEventArgs e)
         {
+            String query = "";
             String DBName = dataGVTenDB.CurrentRow.Cells[0].Value.ToString();
-            String position = dataGVDSBackup.CurrentRow.Cells[0].Value.ToString();
-            String query =  "ALTER DATABASE "+DBName+" SET SINGLE_USER WITH ROLLBACK IMMEDIATE; ";
-            query += ("USE tempdb  RESTORE DATABASE "+DBName+" FROM  "+DBName+"  WITH FILE = "+position+", REPLACE; ");
-            query += ("ALTER DATABASE "+DBName+"  SET MULTI_USER; ");
+            if (!btnPhucHoiTheoThoiGian.Checked) { 
+                String position = dataGVDSBackup.CurrentRow.Cells[0].Value.ToString();
+                query += "ALTER DATABASE " + DBName + " SET SINGLE_USER WITH ROLLBACK IMMEDIATE; ";
+                query += ("USE tempdb  RESTORE DATABASE " + DBName + " FROM  " + DBName + "  WITH FILE = " + position + ", REPLACE; ");
+                query += ("ALTER DATABASE " + DBName + "  SET MULTI_USER; ");
+
+            }else
+            {
+                string[] dateOfLastBackup = dataGVDSBackup.Rows[0].Cells[2].Value.ToString().Split(' ');
+                String timeLastBackup = dateOfLastBackup[1] + " " + dateOfLastBackup[1];
+                DateTime dtChose = DateTime.Parse(timeBackup.Text);
+                DateTime dtLast = DateTime.Parse(dateOfLastBackup[1]+" "+dateOfLastBackup[2]);
+
+                if (String.Compare(dateOfLastBackup[0],dateBackup.Text) == 0 && dtChose < dtLast)
+                {
+                    MessageBox.Show("Thời điểm phục hồi phải sau thời điểm bản sao lưu mới nhất!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+
+                String position = dataGVDSBackup.Rows[0].Cells[0].Value.ToString();
+                String time = dateBackup.DateTime.ToString("yyyy-MM-dd");
+                time +=(" "+ dtChose.ToString("HH:mm:ss"));
+
+                query += "USE master; ALTER DATABASE "+DBName+" SET SINGLE_USER WITH ROLLBACK IMMEDIATE; ";
+                query += "BACKUP LOG " + DBName + " TO DISK = '" + Program.pathBackup + "\\" + DBName + ".trn' WITH NORECOVERY; ";
+                query += "RESTORE DATABASE "+DBName+" FROM TestA WITH FILE = "+position+", NORECOVERY; ";
+                query += "RESTORE DATABASE "+DBName+ " FROM DISK = '" + Program.pathBackup + "\\" + DBName + ".trn' WITH STOPAT='" + time+"', RECOVERY; ";
+                query += "ALTER DATABASE "+DBName+" SET MULTI_USER; ";
+                Console.WriteLine(query);
+            }
+
+            
+            
             int result = Program.ExecSql(query);
 
             if (result == 1 )
@@ -199,6 +234,11 @@ namespace BackupServer
                 timeBackup.Enabled = dateBackup.Enabled = true;
             }
             else timeBackup.Enabled = dateBackup.Enabled = false;
+            string[] dateOfLastBackup = dataGVDSBackup.Rows[0].Cells[2].Value.ToString().Split(' ');
+            dateBackup.Properties.MinValue = DateTime.Parse(dateOfLastBackup[0]);
+            
         }
+
+        
     }
 }
